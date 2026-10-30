@@ -125,11 +125,13 @@ class Recibo
             $db->execute(
                 'INSERT INTO recibos
                    (numero, marca, reserva_id, reserva_numero, cliente_nombre, cliente_doc, cliente_email,
+                    cliente_domicilio, cliente_cond_fiscal,
                     modelo, vin, interno, concepto, moneda, importe, confeccionado_por, creado_en)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?, "USD", ?, ?, datetime("now","localtime"))',
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, "USD", ?, ?, datetime("now","localtime"))',
                 [
                     $numero, $marca, $reservaId, (int) $reserva['numero'],
                     (string) ($reserva['cliente_nombre'] ?? ''), (string) ($reserva['cliente_nro_doc'] ?? ''), $clienteEmail,
+                    self::domicilio($reserva), (string) ($reserva['cliente_cond_fiscal'] ?? ''),
                     (string) ($reserva['modelo'] ?? ''), $vin, $interno, $concepto, $importe,
                     (string) ($u['nombre'] ?? $u['email'] ?? ''),
                 ]
@@ -141,6 +143,31 @@ class Recibo
             try { $pdo->exec('ROLLBACK'); } catch (\Throwable $e2) {}
             return ['error' => $e->getMessage()];
         }
+    }
+
+    /** Domicilio del cliente de la reserva en una línea: "Calle 123, Localidad, Provincia (CP 1234)". '' si no tiene. */
+    public static function domicilio(array $reserva): string
+    {
+        $f     = fn($k) => trim((string) ($reserva[$k] ?? ''));
+        $calle = trim($f('cliente_calle') . ' ' . $f('cliente_numero'));
+        $prov  = mb_strtoupper($f('cliente_provincia'), 'UTF-8') === mb_strtoupper($f('cliente_localidad'), 'UTF-8') ? '' : $f('cliente_provincia');
+        $dom   = implode(', ', array_filter([$calle, $f('cliente_localidad'), $prov], fn($s) => $s !== ''));
+        if ($f('cliente_cp') !== '') { $dom = trim($dom . ' (CP ' . $f('cliente_cp') . ')'); }
+        return $dom;
+    }
+
+    /**
+     * Recibo listo para el PDF. Los emitidos antes de la migración 072 tienen domicilio / condición
+     * fiscal en NULL (no se guardaban): se completan desde la reserva. '' = se guardó vacío, se respeta.
+     */
+    public static function paraPdf(array $rec): array
+    {
+        if (($rec['cliente_domicilio'] ?? null) !== null && ($rec['cliente_cond_fiscal'] ?? null) !== null) { return $rec; }
+        $r = self::db()->fetch('SELECT * FROM reservas WHERE id = ?', [(int) ($rec['reserva_id'] ?? 0)]);
+        if (!$r) { return $rec; }
+        $rec['cliente_domicilio']   = $rec['cliente_domicilio']   ?? self::domicilio($r);
+        $rec['cliente_cond_fiscal'] = $rec['cliente_cond_fiscal'] ?? (string) ($r['cliente_cond_fiscal'] ?? '');
+        return $rec;
     }
 
     /** Deja registro de a qué direcciones se envió el recibo. */

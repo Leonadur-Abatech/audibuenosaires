@@ -2,7 +2,8 @@
 /**
  * Emisión del recibo de seña de una reserva aprobada. Solo se ingresa el importe (USD); el resto
  * sale de la reserva. El email del cliente se confirma (obligatorio) para poder enviárselo.
- * @var array $r @var string $concepto @var array $brandMails @var array $old @var ?array $flash @var string $basePath
+ * @var array $r @var string $concepto @var string $domicilio @var string $condFiscal @var array $brandMails
+ * @var array $old @var ?array $flash @var string $basePath
  */
 $v = fn($k, $def = '') => htmlspecialchars((string) ($old[$k] ?? $def));
 $id = (int) $r['id'];
@@ -26,9 +27,15 @@ $emailReserva = trim((string) ($r['cliente_email'] ?? ''));
                     <dt class="col-5 text-muted fw-normal">Marca</dt><dd class="col-7"><?= htmlspecialchars((string) $r['marca']) ?></dd>
                     <dt class="col-5 text-muted fw-normal">Cliente</dt><dd class="col-7"><?= htmlspecialchars((string) $r['cliente_nombre']) ?></dd>
                     <dt class="col-5 text-muted fw-normal">CUIT / CUIL</dt><dd class="col-7 mono"><?= htmlspecialchars((string) $r['cliente_nro_doc']) ?></dd>
+                    <dt class="col-5 text-muted fw-normal">Domicilio</dt><dd class="col-7"><?= htmlspecialchars($domicilio ?: '—') ?></dd>
+                    <dt class="col-5 text-muted fw-normal">Condición IVA</dt><dd class="col-7"><?= htmlspecialchars($condFiscal ?: '—') ?></dd>
                     <dt class="col-5 text-muted fw-normal">Modelo</dt><dd class="col-7"><?= htmlspecialchars((string) ($r['modelo'] ?: '—')) ?></dd>
                     <dt class="col-5 text-muted fw-normal">VIN</dt><dd class="col-7 mono"><?= htmlspecialchars((string) ($r['vin'] ?: '—')) ?></dd>
                 </dl>
+                <?php $faltan = array_filter([$domicilio === '' ? 'el domicilio' : '', $condFiscal === '' ? 'la condición IVA' : '']); ?>
+                <?php if ($faltan): ?>
+                    <div class="small text-warning-emphasis mt-2">La reserva no tiene <?= implode(' ni ', $faltan) ?> del cliente: el recibo sale sin ese dato.</div>
+                <?php endif; ?>
                 <div class="form-text mt-2">La numeración es automática por marca. El concepto por defecto es <em>«<?= htmlspecialchars($concepto) ?>»</em>.</div>
             </div></div>
         </div>

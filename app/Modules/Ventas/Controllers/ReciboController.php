@@ -50,6 +50,8 @@ class ReciboController extends Controller
             'title'      => 'Emitir recibo · Reserva N° ' . $r['numero'],
             'r'          => $r,
             'concepto'   => Recibo::conceptoPorDefecto($r),
+            'domicilio'  => Recibo::domicilio($r),
+            'condFiscal' => ReciboPdf::condFiscalLabel((string) ($r['cliente_cond_fiscal'] ?? '')),
             'brandMails' => Mailer::parseList((string) Settings::get('recibo_mails_' . strtoupper((string) $r['marca']), '')),
             'old'        => $_SESSION['old'] ?? [],
             'flash'      => $flash,
@@ -139,7 +141,7 @@ class ReciboController extends Controller
             echo '<h1>403</h1><p>No tenés acceso a este recibo.</p>';
             return;
         }
-        $bytes = ReciboPdf::generar($rec);
+        $bytes = ReciboPdf::generar(Recibo::paraPdf($rec));
         $fname = 'recibo-' . str_replace(['/', ' '], '-', (string) $rec['numero']) . '.pdf';
         header('Content-Type: application/pdf');
         header('Content-Disposition: inline; filename="' . $fname . '"');
@@ -162,6 +164,8 @@ class ReciboController extends Controller
             ['Fecha',       $fecha],
             ['Cliente',     $h($rec['cliente_nombre'])],
             ['CUIL/CUIT',   $h($rec['cliente_doc'])],
+            ['Domicilio',   $h($rec['cliente_domicilio'] ?? '')],
+            ['Condición IVA', $h(ReciboPdf::condFiscalLabel((string) ($rec['cliente_cond_fiscal'] ?? '')))],
             ['Email',       $h($rec['cliente_email'])],
             ['Moneda',      $h($monedaLabel)],
             ['Total',       '<strong>' . $h($totalTxt) . '</strong>'],

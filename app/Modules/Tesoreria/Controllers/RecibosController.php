@@ -40,7 +40,7 @@ class RecibosController extends Controller
         Auth::requireAccess('tesoreria_recibos');
         $rec = Recibo::get((int) $p['id']);
         if (!$rec) { $this->redirect('/tesoreria/recibos'); }
-        $bytes = ReciboPdf::generar($rec);
+        $bytes = ReciboPdf::generar(Recibo::paraPdf($rec));
         $fname = 'recibo-' . str_replace(['/', ' '], '-', (string) $rec['numero']) . '.pdf';
         header('Content-Type: application/pdf');
         header('Content-Disposition: inline; filename="' . $fname . '"');

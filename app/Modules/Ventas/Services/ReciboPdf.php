@@ -69,26 +69,29 @@ class ReciboPdf
         $up = fn($s) => mb_strtoupper((string) $s, 'UTF-8');
 
         // ── Datos: cliente y auto (sin repetir lo que ya está en el encabezado / total) ──
+        // Columna izquierda ancha (cliente / domicilio pueden ser largos), derecha angosta (datos cortos).
         $sect(51, 'Comprobante');
-        $c1 = $L; $c2 = 108; $y = 60; $dy = 9.2;
+        $c1 = $L; $c2 = 136; $y = 60; $dy = 9.2;
         $rows = [
-            ['Cliente', (string) ($rec['cliente_nombre'] ?? ''), 'CUIL / CUIT', self::formatDoc((string) ($rec['cliente_doc'] ?? ''))],
-            ['Modelo',  (string) ($rec['modelo'] ?: '—'),        'Interno',     (string) ($rec['interno'] ?: '—')],
-            ['VIN',     (string) ($rec['vin'] ?: '—'),           '',            ''],
+            ['Cliente',   (string) ($rec['cliente_nombre'] ?? ''),    'CUIL / CUIT',   self::formatDoc((string) ($rec['cliente_doc'] ?? ''))],
+            ['Domicilio', (string) ($rec['cliente_domicilio'] ?? ''), 'Condición IVA', self::condFiscalLabel((string) ($rec['cliente_cond_fiscal'] ?? ''))],
+            ['Modelo',    (string) ($rec['modelo'] ?: '—'),           'Interno',       (string) ($rec['interno'] ?: '—')],
+            ['VIN',       (string) ($rec['vin'] ?: '—'),              '',              ''],
         ];
         foreach ($rows as $r) {
             $pdf->setFont('', 7.2); $pdf->setTextColor(...$gray); $pdf->text($c1, $y - 3.6, $up($r[0]));
-            $pdf->setFont('B', 9.8); $pdf->setTextColor(25); $pdf->text($c1, $y + 1.2, $r[1] !== '' ? $r[1] : '—');
+            $pdf->setTextColor(25); self::fitText($pdf, $c1, $y + 1.2, $r[1] !== '' ? $r[1] : '—', $c2 - $c1 - 4);
             if ($r[2] !== '') {
                 $pdf->setFont('', 7.2); $pdf->setTextColor(...$gray); $pdf->text($c2, $y - 3.6, $up($r[2]));
-                $pdf->setFont('B', 9.8); $pdf->setTextColor(25); $pdf->text($c2, $y + 1.2, $r[3] !== '' ? $r[3] : '—');
+                $pdf->setTextColor(25); self::fitText($pdf, $c2, $y + 1.2, $r[3] !== '' ? $r[3] : '—', $R - $c2);
             }
             $y += $dy;
         }
 
-        // ── Detalle de valores recibidos ──
-        $sect(96, 'Detalle de valores recibidos');
-        $ty = 104;
+        // ── Detalle de valores recibidos ── (arranca debajo de la grilla de datos)
+        $dv = $y + 8.4;
+        $sect($dv, 'Detalle de valores recibidos');
+        $ty = $dv + 8;
         $pdf->setFont('', 6.8); $pdf->setTextColor(...$gray);
         $pdf->text($L, $ty, 'FECHA');
         $pdf->text($L + 40, $ty, 'MONEDA');
@@ -101,9 +104,9 @@ class ReciboPdf
         $pdf->setDrawColor(...$hair); $pdf->line($L, $ty + 12, $R, $ty + 12, 0.2);
 
         // ── Concepto ──
-        $sect(124, 'Concepto');
+        $sect($dv + 28, 'Concepto');
         $pdf->setFont('', 10); $pdf->setTextColor(35);
-        $cy = 132;
+        $cy = $dv + 36;
         foreach ($pdf->wrap((string) ($rec['concepto'] ?? ''), $W) as $ln) { $pdf->text($L, $cy, $ln); $cy += 5.6; }
 
         // ── Sello ANULADO ──
@@ -196,6 +199,14 @@ class ReciboPdf
         }
     }
 
+    /** Valor en negrita que entra en $maxW (mm): achica la fuente hasta $min y, si igual no entra, recorta con '…'. */
+    private static function fitText(Pdf $pdf, float $x, float $y, string $txt, float $maxW, float $size = 9.8, float $min = 6.5): void
+    {
+        $pdf->setFont('B', $size);
+        while ($size > $min && $pdf->stringWidth($txt) > $maxW) { $size -= 0.2; $pdf->setFont('B', $size); }
+        $pdf->text($x, $y, self::clip($pdf, $txt, $maxW));
+    }
+
     /** Recorta un texto con '…' para que entre en $maxW (mm) con la fuente/tamaño actual. */
     private static function clip(Pdf $pdf, string $txt, float $maxW): string
     {
@@ -224,6 +235,13 @@ class ReciboPdf
         $label   = $esPesos ? 'Pesos' : 'Dólares';
         $total   = ($esPesos ? '$ ' : 'USD ') . number_format($importe, 0, ',', '.');
         return [$label, $total];
+    }
+
+    /** Condición fiscal del cliente (código de la reserva) ⇒ texto. 'resp_inscripto' ⇒ "Responsable Inscripto". */
+    public static function condFiscalLabel(string $cod): string
+    {
+        $map = ['resp_inscripto' => 'Responsable Inscripto', 'consumidor_final' => 'Consumidor Final'];
+        return $map[trim($cod)] ?? trim($cod);
     }
 
     /**
