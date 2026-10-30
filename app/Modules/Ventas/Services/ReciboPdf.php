@@ -128,12 +128,14 @@ class ReciboPdf
         }
 
         // ── Firmas ──
-        // Izquierda: firma digital (simulada) del usuario que emite + su nombre.
+        // Izquierda: firma digital (simulada) del usuario que emite (el responsable de la operación,
+        // no siempre un vendedor) + aclaración con su nombre.
         $confec = trim((string) ($rec['confeccionado_por'] ?? ''));
         if ($confec !== '') { self::signature($pdf, $L + 2, 252, self::iniciales($confec), $accent); }
         $pdf->setDrawColor(...$hair); $pdf->line($L, 258, $L + 70, 258, 0.3);
         $pdf->setFont('', 7.5); $pdf->setTextColor(...$gray);
-        $pdf->text($L, 263, 'Firma del vendedor' . ($confec !== '' ? ' · ' . $confec : ''));
+        $pdf->text($L, 263, 'Firma del responsable');
+        if ($confec !== '') { $pdf->text($L, 267.5, 'Aclaración: ' . self::clip($pdf, $confec, 52)); }
 
         // Derecha: firma del cliente (solo firma; la aclaración ya va impresa con su nombre).
         $pdf->setDrawColor(...$hair); $pdf->line($R - 70, 258, $R, 258, 0.3);
